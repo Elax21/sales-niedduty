@@ -1,0 +1,8 @@
+<svg viewBox="0 0 380 72" width="380" height="72" fill="none" xmlns="http://www.w3.org/2000/svg" xmlns:c2pa="http://c2pa.org/manifest">
+  <g transform="translate(0, 8)">
+    <path d="M8 48 L22 10 L28 10 L14 48 Z" fill="#5B8AB5"></path>
+    <path d="M22 10 L38 10 L48 48 L42 48 Z" fill="#5B8AB5"></path>
+    <rect x="20" y="6" width="6" height="3" rx="1" fill="#5B8AB5" opacity="0.4"></rect>
+  </g>
+  <text x="66" y="46" font-family="'Fraunces', Georgia, serif" font-size="36" font-weight="600" letter-spacing="-0.5" fill="#F2F1EE">niedduty</text>
+</svg>

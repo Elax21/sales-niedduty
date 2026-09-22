@@ -1,0 +1,26 @@
+# /etc/systemd/system/niedduty-sales.service
+[Unit]
+Description=Niedduty Sales (sales.niedduty.de)
+After=network-online.target
+
+[Service]
+Type=simple
+User=niedduty-sales
+Group=niedduty-sales
+EnvironmentFile=/etc/niedduty/sales.env
+Environment=SALES_DB=/var/lib/niedduty-sales/sales.db
+ExecStart=/usr/bin/python3 /opt/niedduty-sales/server.py
+Restart=always
+RestartSec=3
+
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/var/lib/niedduty-sales
+PrivateDevices=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+MemoryMax=192M
+
+[Install]
+WantedBy=multi-user.target

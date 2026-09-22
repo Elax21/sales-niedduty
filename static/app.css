@@ -1,0 +1,211 @@
+/* ============================================================
+   Niedduty Sales. Design-System der Website, als Werkzeug:
+   ruhiger, dichter, eine Akzentfarbe. Hell und dunkel nach System.
+   ============================================================ */
+
+@font-face { font-family: 'Fraunces'; src: url('/schriften/fraunces.woff2') format('woff2'); font-weight: 100 900; font-display: swap; }
+@font-face { font-family: 'IBM Plex Sans'; src: url('/schriften/plexsans.woff2') format('woff2'); font-weight: 100 700; font-display: swap; }
+@font-face { font-family: 'IBM Plex Mono'; src: url('/schriften/plexmono.woff2') format('woff2'); font-weight: 100 700; font-display: swap; }
+
+:root {
+  --bg: #FCFBF9; --flaeche: #FFFFFF; --flaeche-2: #F4F2ED; --tinte: #15171A; --dim: #5B5F66;
+  --linie: rgba(21,23,26,.10); --linie-hi: rgba(21,23,26,.20);
+  --blau: #1B3A5C; --blau-hell: #2C5C8F; --auf-blau: #FFFFFF; --blau-flaeche: #E9EEF4;
+  --rot: #9A2F1F; --rot-flaeche: #F7E7E3; --gruen: #2D6A3E; --gruen-flaeche: #E5F0E7;
+  --display: 'Fraunces', Georgia, serif; --body: 'IBM Plex Sans', -apple-system, 'Segoe UI', sans-serif;
+  --mono: 'IBM Plex Mono', ui-monospace, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #111315; --flaeche: #1A1D20; --flaeche-2: #22262A; --tinte: #ECEAE6; --dim: #A4A8AE;
+    --linie: rgba(255,255,255,.09); --linie-hi: rgba(255,255,255,.18);
+    --blau: #8DB4DC; --blau-hell: #B3CEEA; --auf-blau: #0E1A27; --blau-flaeche: #1D2B3A;
+    --rot: #F0A493; --rot-flaeche: #3A2420; --gruen: #9ACFA6; --gruen-flaeche: #1F3325;
+    color-scheme: dark;
+  }
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html { background: var(--bg); -webkit-font-smoothing: antialiased; }
+body { font-family: var(--body); color: var(--tinte); background: var(--bg); font-size: 15px; line-height: 1.5; }
+a { color: inherit; }
+button, input, select, textarea { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--blau); outline-offset: 2px; border-radius: 3px; }
+
+h1, h2 { font-family: var(--display); font-weight: 600; line-height: 1.15; font-variation-settings: 'SOFT' 20, 'WONK' 1; }
+h1 { font-size: clamp(1.6rem, 4vw, 2.1rem); }
+h2 { font-size: 1.2rem; }
+h3 { font-size: 1rem; font-weight: 600; }
+.dim { color: var(--dim); }
+.mono { font-family: var(--mono); }
+
+/* ---------- Rahmen ---------- */
+.rahmen { display: grid; grid-template-columns: 220px 1fr; min-height: 100vh; }
+.leiste { position: sticky; top: 0; height: 100vh; padding: 24px 16px; border-right: 1px solid var(--linie);
+  display: flex; flex-direction: column; gap: 28px; background: var(--flaeche); }
+.leiste .marke { display: flex; align-items: center; gap: 10px; padding: 0 8px; font-family: var(--display);
+  font-size: 1.3rem; font-weight: 600; text-decoration: none; }
+.leiste .marke img { width: 26px; height: 26px; }
+.nav { display: grid; gap: 2px; }
+.nav a { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 7px; text-decoration: none; color: var(--dim); font-weight: 500; }
+.nav a svg { width: 18px; height: 18px; flex: none; }
+.nav a:hover { background: var(--flaeche-2); color: var(--tinte); }
+.nav a[aria-current="page"] { background: var(--blau-flaeche); color: var(--blau); }
+.leiste .unten { margin-top: auto; }
+.inhalt { padding: 32px clamp(18px, 4vw, 48px) 80px; max-width: 1280px; width: 100%; }
+.kopfzeile { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px; margin-bottom: 24px; }
+.kopfzeile .aktionen { display: flex; gap: 8px; flex-wrap: wrap; }
+
+@media (max-width: 860px) {
+  .rahmen { grid-template-columns: 1fr; }
+  .leiste { position: fixed; z-index: 20; top: auto; bottom: 0; left: 0; right: 0; height: auto; padding: 6px 8px calc(6px + env(safe-area-inset-bottom));
+    border-right: 0; border-top: 1px solid var(--linie); flex-direction: row; }
+  .leiste .marke, .leiste .unten { display: none; }
+  .nav { grid-auto-flow: column; grid-auto-columns: 1fr; width: 100%; }
+  .nav a { flex-direction: column; gap: 2px; padding: 6px 2px; font-size: .72rem; justify-content: center; }
+  .inhalt { padding: 22px 16px 96px; }
+}
+
+/* ---------- Bausteine ---------- */
+.btn { display: inline-flex; align-items: center; gap: 8px; padding: 9px 15px; border-radius: 7px; border: 1px solid var(--linie-hi);
+  background: var(--flaeche); cursor: pointer; font-weight: 500; font-size: .92rem; text-decoration: none; white-space: nowrap; }
+.btn:hover { border-color: var(--tinte); }
+.btn--voll { background: var(--blau); color: var(--auf-blau); border-color: var(--blau); }
+.btn--voll:hover { background: var(--blau-hell); border-color: var(--blau-hell); }
+.btn--leise { border-color: transparent; background: transparent; color: var(--dim); }
+.btn--leise:hover { color: var(--tinte); border-color: var(--linie-hi); }
+.btn--rot { color: var(--rot); }
+.btn:disabled { opacity: .5; cursor: default; }
+
+.karte { background: var(--flaeche); border: 1px solid var(--linie); border-radius: 10px; padding: 18px 20px; }
+.raster { display: grid; gap: 14px; }
+.raster--4 { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+.raster--2 { grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
+
+.kennzahl .wert { font-family: var(--display); font-size: 1.9rem; font-weight: 600; line-height: 1.1; margin-top: 6px;
+  font-variation-settings: 'SOFT' 20, 'WONK' 1; }
+.kennzahl .klein { font-size: .85rem; color: var(--dim); margin-top: 4px; }
+.balken { height: 8px; border-radius: 4px; background: var(--flaeche-2); margin-top: 12px; overflow: hidden; }
+.balken i { display: block; height: 100%; background: var(--blau); border-radius: 4px; }
+.balken.warn i { background: var(--rot); }
+
+.chip { display: inline-block; font-size: .78rem; font-weight: 600; padding: 2px 8px; border-radius: 99px; background: var(--flaeche-2); color: var(--dim); }
+.chip--blau { background: var(--blau-flaeche); color: var(--blau); }
+.chip--gruen { background: var(--gruen-flaeche); color: var(--gruen); }
+.chip--rot { background: var(--rot-flaeche); color: var(--rot); }
+
+.liste { list-style: none; }
+.liste li { display: flex; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--linie); }
+.liste li:last-child { border-bottom: 0; }
+.liste a { text-decoration: none; font-weight: 500; }
+.liste a:hover { color: var(--blau); }
+.leer { color: var(--dim); font-size: .92rem; padding: 6px 0; }
+.ueberfaellig { color: var(--rot); }
+
+/* ---------- Tabellen ---------- */
+.tabelle { width: 100%; border-collapse: collapse; font-size: .93rem; }
+.tabelle th { text-align: left; font-weight: 600; font-size: .8rem; color: var(--dim); padding: 0 10px 8px; border-bottom: 1px solid var(--linie-hi); }
+.tabelle td { padding: 11px 10px; border-bottom: 1px solid var(--linie); vertical-align: top; }
+.tabelle tr.klickbar { cursor: pointer; }
+.tabelle tr.klickbar:hover td { background: var(--flaeche-2); }
+.tabelle .rechts { text-align: right; }
+@media (max-width: 700px) { .tabelle .weg { display: none; } }
+
+/* ---------- Formulare ---------- */
+.feld { display: grid; gap: 4px; }
+.feld label { font-size: .8rem; font-weight: 600; color: var(--dim); }
+.feld input, .feld select, .feld textarea { width: 100%; padding: 9px 11px; border: 1px solid var(--linie-hi); border-radius: 7px; background: var(--flaeche); }
+.feld textarea { min-height: 84px; resize: vertical; }
+.feld input:focus, .feld select:focus, .feld textarea:focus { outline: 2px solid var(--blau); outline-offset: -1px; border-color: transparent; }
+.felder { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+.suche { max-width: 320px; }
+.gespeichert { font-size: .8rem; color: var(--gruen); min-height: 1.2em; }
+
+/* ---------- Pipeline ---------- */
+.pipeline { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(230px, 1fr); gap: 12px; overflow-x: auto; padding-bottom: 12px;
+  scroll-snap-type: x proximity; }
+.spalte { background: var(--flaeche-2); border-radius: 10px; padding: 10px; min-height: 240px; scroll-snap-align: start; }
+.spalte.ziel { outline: 2px dashed var(--blau); outline-offset: -2px; }
+.spalte h3 { display: flex; justify-content: space-between; font-size: .88rem; padding: 2px 4px 10px; }
+.spalte .summe { font-family: var(--mono); font-size: .78rem; color: var(--dim); font-weight: 400; }
+.kachel { display: block; background: var(--flaeche); border: 1px solid var(--linie); border-radius: 8px; padding: 10px 12px; margin-bottom: 8px;
+  text-decoration: none; cursor: grab; }
+.kachel:hover { border-color: var(--linie-hi); }
+.kachel b { display: block; font-weight: 600; }
+.kachel .schritt { font-size: .84rem; color: var(--dim); margin-top: 2px; }
+.kachel .fuss { display: flex; justify-content: space-between; margin-top: 8px; font-size: .78rem; }
+.kachel .fuss .mono { color: var(--dim); }
+
+/* ---------- Verlauf ---------- */
+.verlauf { list-style: none; display: grid; gap: 12px; margin-top: 14px; }
+.verlauf li { display: grid; grid-template-columns: 92px 1fr; gap: 10px; font-size: .92rem; }
+.verlauf time { font-family: var(--mono); font-size: .78rem; color: var(--dim); padding-top: 2px; }
+.verlauf p { white-space: pre-wrap; }
+
+/* ---------- Beleg-Editor ---------- */
+.editor { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 22px; align-items: start; }
+@media (max-width: 1100px) { .editor { grid-template-columns: 1fr; } }
+.positionen { display: grid; gap: 10px; }
+.position { display: grid; grid-template-columns: 1fr 70px 80px 100px 32px; gap: 6px; align-items: start;
+  padding: 10px; border: 1px solid var(--linie); border-radius: 8px; background: var(--flaeche); }
+.position .voll { grid-column: 1 / -2; }
+.position input, .position textarea { width: 100%; padding: 7px 9px; border: 1px solid var(--linie-hi); border-radius: 6px; background: var(--flaeche); font-size: .9rem; }
+.position textarea { min-height: 44px; resize: vertical; }
+.position .weg { border: 0; background: none; cursor: pointer; color: var(--dim); font-size: 1.2rem; line-height: 1; padding-top: 6px; }
+@media (max-width: 560px) { .position { grid-template-columns: 1fr 1fr 1fr 32px; } .position .titel { grid-column: 1 / -2; } }
+.bausteine { display: flex; flex-wrap: wrap; gap: 6px; }
+.bausteine button { font-size: .8rem; padding: 4px 9px; border-radius: 99px; border: 1px dashed var(--linie-hi); background: none; cursor: pointer; color: var(--dim); }
+.bausteine button:hover { color: var(--tinte); border-color: var(--tinte); }
+
+/* ---------- A4-Vorschau (auch Druck) ---------- */
+.vorschau-rahmen { position: sticky; top: 20px; overflow: auto; background: var(--flaeche-2); border-radius: 10px; padding: 14px; }
+.a4 { --t: #15171A; --d: #5B5F66; --l: rgba(21,23,26,.12); --b: #1B3A5C;
+  width: 210mm; min-height: 297mm; background: #fff; color: var(--t); padding: 14mm 18mm 11mm; display: flex; flex-direction: column;
+  font-size: 9.2pt; line-height: 1.45; transform-origin: top left; box-shadow: 0 2px 14px rgba(0,0,0,.12); }
+.a4 .k { display: flex; justify-content: space-between; align-items: flex-start; }
+.a4 .k img { height: 10mm; }
+.a4 .abs { text-align: right; font-size: 8.4pt; color: var(--d); line-height: 1.55; white-space: pre-line; }
+.a4 .abs b { color: var(--t); font-weight: 600; }
+.a4 .ans { margin-top: 8mm; }
+.a4 .rs { font-size: 7.4pt; color: var(--d); padding-bottom: 2mm; border-bottom: 1px solid var(--l); width: 85mm; margin-bottom: 3mm; }
+.a4 .emp { font-size: 10pt; white-space: pre-line; min-height: 20mm; }
+.a4 .dat { margin-top: 5mm; display: flex; justify-content: space-between; align-items: flex-end; gap: 10mm; }
+.a4 h1 { font-size: 19pt; color: var(--t); }
+.a4 dl { display: grid; grid-template-columns: auto auto; gap: 1mm 6mm; font-size: 8.8pt; }
+.a4 dt { color: var(--d); }
+.a4 dd { font-family: var(--mono); text-align: right; }
+.a4 .oben { margin-top: 5mm; white-space: pre-line; }
+.a4 table { width: 100%; border-collapse: collapse; margin-top: 5mm; }
+.a4 th { text-align: left; font-weight: 600; font-size: 8.4pt; color: var(--d); padding: 0 0 2mm; border-bottom: 1.5px solid var(--t); }
+.a4 td { padding: 1.3mm 0; border-bottom: 1px solid var(--l); vertical-align: top; }
+.a4 td small { display: block; color: var(--d); font-size: 7.9pt; line-height: 1.4; }
+.a4 .nr { width: 8mm; font-family: var(--mono); color: var(--d); }
+.a4 .me { width: 20mm; }
+.a4 .g { width: 26mm; text-align: right; font-family: var(--mono); white-space: nowrap; }
+.a4 .sum { margin-left: auto; width: 112mm; margin-top: 3mm; }
+.a4 .sum div { display: flex; justify-content: space-between; padding: 1.2mm 0; }
+.a4 .sum span:last-child { font-family: var(--mono); white-space: nowrap; padding-left: 4mm; }
+.a4 .sum .ab { color: var(--d); }
+.a4 .sum .of { margin-top: 1.5mm; padding: 3mm 4mm; background: var(--b); color: #fff; border-radius: 2mm; font-weight: 600; font-size: 11pt; }
+.a4 .hin { margin-top: 5mm; white-space: pre-line; }
+.a4 .fu { margin-top: auto; padding-top: 3mm; border-top: 1px solid var(--l); display: grid; grid-template-columns: repeat(3, 1fr);
+  gap: 6mm; font-size: 7.3pt; color: var(--d); line-height: 1.4; }
+.a4 .fu b { color: var(--t); font-weight: 600; }
+.a4 .storno { color: #9A2F1F; font-family: var(--mono); font-size: 9pt; border: 1px solid #9A2F1F; padding: 1px 6px; border-radius: 3px; margin-left: 4mm; vertical-align: middle; }
+
+@page { size: A4; margin: 0; }
+@media print {
+  html, body { background: #fff; }
+  .leiste, .kopfzeile, .editor > :first-child { display: none !important; }
+  .rahmen, .editor { display: block; min-height: 0; }
+  .inhalt { padding: 0; max-width: none; }
+  .vorschau-rahmen { position: static; padding: 0; background: none; border-radius: 0; overflow: visible; height: auto !important; }
+  .a4 { transform: none !important; box-shadow: none; width: 210mm; height: 297mm; min-height: 0; overflow: hidden; }
+}
+
+/* ---------- Anmeldung ---------- */
+.anmeldung { min-height: 100vh; display: grid; place-items: center; padding: 20px; }
+.anmeldung form { width: min(360px, 100%); display: grid; gap: 14px; }
+.anmeldung img { height: 30px; justify-self: start; }
+.meldung { font-size: .9rem; color: var(--rot); min-height: 1.3em; }
