@@ -9,6 +9,8 @@ const STUFEN = [
   ['angebot', 'Angebot'], ['gewonnen', 'Gewonnen'], ['verloren', 'Verloren'],
 ];
 const STUFE_NAME = Object.fromEntries(STUFEN);
+const ENTWURF = { fehlt: ['fehlt', 'rot'], in_arbeit: ['in Arbeit', ''], fertig: ['fertig', 'blau'], verschickt: ['verschickt', 'gruen'] };
+const entwurfChip = (s) => h('span', { class: 'chip' + (ENTWURF[s][1] ? ' chip--' + ENTWURF[s][1] : '') }, 'Entwurf ' + ENTWURF[s][0]);
 const STATUS = { entwurf: ['Entwurf', ''], gestellt: ['Gestellt', 'blau'], bezahlt: ['Bezahlt', 'gruen'], storniert: ['Storniert', 'rot'] };
 
 // Häufige Positionen, ein Klick fügt sie ein
@@ -141,6 +143,16 @@ async function seiteUebersicht() {
         u.faellig.length ? h('ul', { class: 'liste' }, u.faellig.map(eintrag)) : h('p', { class: 'leer' }, 'Nichts fällig.')),
       h('div', { class: 'karte' }, h('h2', {}, 'Nächste 7 Tage'),
         u.bald.length ? h('ul', { class: 'liste' }, u.bald.map(eintrag)) : h('p', { class: 'leer' }, 'Nichts geplant.'))),
+    u.boni.length ? h('div', { class: 'karte', style: 'margin-top:14px' }, h('h2', {}, 'Empfehlungsbonus fällig'),
+      h('p', { class: 'dim', style: 'font-size:.88rem' }, 'Empfohlene Firmen, die Kunde geworden sind.'),
+      h('ul', { class: 'liste' }, u.boni.map((x) => h('li', {},
+        h('span', {}, h('a', { href: '#/firmen/' + x.von_id }, x.von), h('span', { class: 'dim' }, ' hat '), h('a', { href: '#/firmen/' + x.id }, x.name), h('span', { class: 'dim' }, ' gebracht')),
+        h('button', { class: 'btn', onclick: async () => { await api('PUT', 'firmen/' + x.id, { bonus_erledigt: 1 }); seiteUebersicht(); } }, 'Erledigt'))))) : null,
+    h('div', { class: 'karte', style: 'margin-top:14px' }, h('h2', {}, 'Entwürfe offen'),
+      h('p', { class: 'dim', style: 'font-size:.88rem' }, 'Firmen im Gespräch, für die noch kein Entwurf fertig ist.'),
+      u.entwuerfe_offen.length ? h('ul', { class: 'liste' }, u.entwuerfe_offen.map((f) => h('li', {},
+        h('a', { href: '#/firmen/' + f.id }, f.name), h('span', {}, h('span', { class: 'dim' }, STUFE_NAME[f.stufe], ' · '), entwurfChip(f.entwurf_status)))))
+        : h('p', { class: 'leer' }, 'Alles erledigt.')),
     h('div', { class: 'karte', style: 'margin-top:14px' }, h('h2', {}, 'Pipeline'),
       h('ul', { class: 'liste' }, STUFEN.map(([id, name]) =>
         h('li', {}, h('a', { href: '#/pipeline' }, name), h('span', { class: 'mono' }, u.stufen[id] || 0))))));
@@ -190,8 +202,9 @@ async function seiteFirmen() {
         h('td', {}, h('b', {}, f.name), h('div', { class: 'dim' }, f.ansprechpartner)),
         h('td', { class: 'weg' }, f.plz_ort),
         h('td', {}, h('span', { class: 'chip' + (f.stufe === 'gewonnen' ? ' chip--gruen' : f.stufe === 'verloren' ? ' chip--rot' : '') }, STUFE_NAME[f.stufe])),
+        h('td', { class: 'weg' }, f.entwurf_link ? h('a', { href: f.entwurf_link, target: '_blank', rel: 'noopener', onclick: (e) => e.stopPropagation() }, entwurfChip(f.entwurf_status)) : entwurfChip(f.entwurf_status)),
         h('td', { class: 'weg' }, f.naechster_schritt, f.faellig_am ? h('div', { class: 'mono dim' }, datum(f.faellig_am)) : null))));
-    if (!koerper.children.length) koerper.append(h('tr', {}, h('td', { colspan: 4, class: 'leer' }, 'Keine Firma gefunden.')));
+    if (!koerper.children.length) koerper.append(h('tr', {}, h('td', { colspan: 5, class: 'leer' }, 'Keine Firma gefunden.')));
   };
   zeichnen();
   rahmen('firmen',
@@ -199,20 +212,22 @@ async function seiteFirmen() {
     h('div', { class: 'feld suche', style: 'margin-bottom:16px' },
       h('input', { type: 'search', placeholder: 'Suchen: Name, Ort, Branche …', 'aria-label': 'Firmen suchen', oninput: (e) => zeichnen(e.target.value) })),
     h('div', { class: 'karte' }, h('table', { class: 'tabelle' },
-      h('thead', {}, h('tr', {}, h('th', {}, 'Firma'), h('th', { class: 'weg' }, 'Ort'), h('th', {}, 'Stufe'), h('th', { class: 'weg' }, 'Nächster Schritt'))),
+      h('thead', {}, h('tr', {}, h('th', {}, 'Firma'), h('th', { class: 'weg' }, 'Ort'), h('th', {}, 'Stufe'), h('th', { class: 'weg' }, 'Entwurf'), h('th', { class: 'weg' }, 'Nächster Schritt'))),
       koerper)));
 }
 
 const FELDER = [
   ['name', 'Firma'], ['ansprechpartner', 'Ansprechpartner'], ['telefon', 'Telefon', 'tel'], ['email', 'E-Mail', 'email'],
   ['website', 'Website'], ['strasse', 'Straße'], ['plz_ort', 'PLZ und Ort'], ['branche', 'Branche'],
-  ['quelle', 'Quelle (wie gefunden)'], ['empfohlen_von', 'Empfohlen von'],
+  ['quelle', 'Quelle (wie gefunden)'], ['empfohlen_von', 'Empfohlen von (Person)'],
   ['wert_einmalig', 'Wert einmalig (€)', 'number'], ['wert_monatlich', 'Wert monatlich (€)', 'number'],
 ];
 
 async function seiteFirma(id) {
   const neu = id === 'neu';
-  const f = neu ? { stufe: 'idee', verlauf: [], belege: [] } : await api('GET', 'firmen/' + id);
+  const [f, alle] = await Promise.all([
+    neu ? { stufe: 'idee', verlauf: [], belege: [], dateien: [], empfehlungen: [] } : api('GET', 'firmen/' + id),
+    api('GET', 'firmen')]);
   const status = h('p', { class: 'gespeichert', 'aria-live': 'polite' });
   const speichern = async (daten) => {
     if (neu) return;
@@ -237,6 +252,10 @@ async function seiteFirma(id) {
         h('select', { id: 'f-stufe', name: 'stufe', onchange: (e) => speichern({ stufe: e.target.value }) },
           STUFEN.map(([v, n]) => h('option', { value: v, selected: f.stufe === v }, n)))),
       eingabe('naechster_schritt', 'Nächster Schritt'),
+      h('div', { class: 'feld' }, h('label', { for: 'f-empfohlen_von_id' }, 'Empfohlen von (Firma)'),
+        h('select', { id: 'f-empfohlen_von_id', name: 'empfohlen_von_id', onchange: (e) => speichern({ empfohlen_von_id: e.target.value }) },
+          h('option', { value: '' }, '—'),
+          alle.filter((x) => String(x.id) !== String(id)).map((x) => h('option', { value: x.id, selected: f.empfohlen_von_id === x.id }, x.name)))),
       eingabe('faellig_am', 'Fällig am', 'date')),
     h('div', { class: 'feld', style: 'margin-top:12px' }, h('label', { for: 'f-notiz' }, 'Notiz'),
       h('textarea', { id: 'f-notiz', name: 'notiz', onchange: (e) => speichern({ notiz: e.target.value }) }, f.notiz || '')),
@@ -257,6 +276,44 @@ async function seiteFirma(id) {
         await api('POST', `firmen/${id}/verlauf`, { text: notiz.value }); seiteFirma(id);
       } }, notiz, h('button', { class: 'btn', type: 'submit', style: 'justify-self:start' }, 'Notiz speichern')),
       h('ul', { class: 'verlauf' }, f.verlauf.map((v) => h('li', {}, h('time', { datetime: v.zeit }, datum(v.zeit)), h('p', {}, v.text))))),
+    h('div', { class: 'karte' }, h('h2', {}, 'Empfehlungen'),
+      f.empfohlen_von_name ? h('p', { class: 'dim', style: 'margin-top:4px' }, 'Selbst empfohlen von ', h('a', { href: '#/firmen/' + f.empfohlen_von_id }, f.empfohlen_von_name)) : null,
+      f.empfehlungen.length ? h('ul', { class: 'liste' }, f.empfehlungen.map((x) => h('li', {},
+        h('a', { href: '#/firmen/' + x.id }, x.name),
+        x.stufe !== 'gewonnen' ? h('span', { class: 'chip' }, STUFE_NAME[x.stufe])
+          : x.bonus_erledigt ? h('span', { class: 'chip chip--gruen' }, 'Bonus erledigt')
+          : h('button', { class: 'btn', onclick: async () => { await api('PUT', 'firmen/' + x.id, { bonus_erledigt: 1 }); seiteFirma(id); } }, 'Bonus fällig · erledigt?'))))
+        : h('p', { class: 'leer' }, 'Hat noch niemanden empfohlen.')),
+    h('div', { class: 'karte raster' }, h('h2', {}, 'Entwurf'),
+      h('div', { class: 'felder' },
+        h('div', { class: 'feld' }, h('label', { for: 'f-entwurf_status' }, 'Status'),
+          h('select', { id: 'f-entwurf_status', onchange: (e) => speichern({ entwurf_status: e.target.value }) },
+            Object.entries(ENTWURF).map(([v, [n]]) => h('option', { value: v, selected: f.entwurf_status === v }, n)))),
+        h('div', { class: 'feld' }, h('label', { for: 'f-entwurf_link' }, 'Link zum Entwurf'),
+          h('input', { id: 'f-entwurf_link', type: 'url', placeholder: 'niedduty.de/fuer/…', value: f.entwurf_link || '',
+            onchange: async (e) => { await speichern({ entwurf_link: e.target.value }); seiteFirma(id); } }))),
+      f.entwurf_link ? h('a', { class: 'btn', href: f.entwurf_link, target: '_blank', rel: 'noopener', style: 'justify-self:start' }, 'Entwurf öffnen ↗') : null,
+      h('h3', { style: 'margin-top:6px' }, 'Dateien'),
+      f.dateien.length ? h('ul', { class: 'liste' }, f.dateien.map((d) => h('li', {},
+        h('a', { href: '/api/dateien/' + d.id, target: '_blank', rel: 'noopener' }, d.original),
+        h('span', {}, h('span', { class: 'dim mono' }, `${d.art.toUpperCase()} · ${Math.max(1, Math.round(d.groesse / 1024))} KB `),
+          h('button', { class: 'btn btn--leise', 'aria-label': 'Datei löschen', onclick: async () => {
+            if (!confirm(`„${d.original}“ löschen?`)) return; await api('DELETE', 'dateien/' + d.id); seiteFirma(id);
+          } }, '×')))))
+        : h('p', { class: 'leer' }, 'Screenshots, Mockups oder PDFs ablegen.'),
+      (() => {
+        const eingabe = h('input', { type: 'file', accept: 'image/jpeg,image/png,image/webp,application/pdf', multiple: true, hidden: true,
+          onchange: async (e) => {
+            for (const datei of e.target.files) {
+              if (datei.size > 15 * 1024 * 1024) { alert(`${datei.name} ist zu groß (höchstens 15 MB).`); continue; }
+              const r = await fetch(`/api/firmen/${id}/dateien`, { method: 'POST', body: datei,
+                headers: { 'X-Niedduty': '1', 'X-Dateiname': encodeURIComponent(datei.name), 'Content-Type': datei.type || 'application/octet-stream' } });
+              if (!r.ok) alert((await r.json().catch(() => ({}))).fehler || 'Hochladen fehlgeschlagen');
+            }
+            seiteFirma(id);
+          } });
+        return h('div', {}, eingabe, h('button', { class: 'btn', onclick: () => eingabe.click() }, 'Dateien hochladen'));
+      })()),
     h('div', { class: 'karte' }, h('h2', {}, 'Belege'),
       f.belege.length ? h('ul', { class: 'liste' }, f.belege.map((b) => h('li', {},
         h('a', { href: '#/belege/' + b.id }, `${b.art === 'angebot' ? 'Angebot' : 'Rechnung'} ${b.nummer || '(Entwurf)'}`),

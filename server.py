@@ -39,15 +39,21 @@ PORT = int(os.environ.get('SALES_PORT', '8083'))
 DEV = os.environ.get('SALES_DEV') == '1'
 PASSWORT_HASH = os.environ.get('SALES_PASSWORT_HASH', '')
 
+DATEIEN = DB.parent / 'dateien'
 COOKIE = 'sitzung' if DEV else '__Host-sitzung'
 SITZUNG_TAGE = 30
 MAX_BYTES = 512 * 1024
+MAX_DATEI = 15 * 1024 * 1024
+DATEI_NAME = re.compile(r'^[0-9a-f]{24}\.(jpg|png|webp|pdf)$')
+DATEI_TYP = {'jpg': 'image/jpeg', 'png': 'image/png', 'webp': 'image/webp', 'pdf': 'application/pdf'}
+ENTWURF_STATUS = ['fehlt', 'in_arbeit', 'fertig', 'verschickt']
 
 STUFEN = ['idee', 'kontakt', 'gespraech', 'angebot', 'gewonnen', 'verloren']
 BELEG_ARTEN = {'angebot', 'rechnung'}
 FIRMEN_FELDER = ['name', 'ansprechpartner', 'telefon', 'email', 'website', 'strasse', 'plz_ort',
                  'branche', 'quelle', 'empfohlen_von', 'stufe', 'wert_einmalig', 'wert_monatlich',
-                 'naechster_schritt', 'faellig_am', 'notiz']
+                 'naechster_schritt', 'faellig_am', 'notiz', 'entwurf_status', 'entwurf_link',
+                 'empfohlen_von_id', 'bonus_erledigt']
 EINSTELLUNGEN = {
     'name': 'Niedduty · Alessandro Nieddu', 'strasse': 'Rosenstraße 1b-c', 'plz_ort': '59227 Ahlen',
     'telefon': '+49 1517 4456084', 'email': 'info@niedduty.de', 'web': 'niedduty.de',
@@ -85,6 +91,11 @@ CREATE TABLE IF NOT EXISTS belege (
   empfaenger TEXT DEFAULT '',
   bezahlt_am TEXT DEFAULT '', erstellt TEXT NOT NULL, geaendert TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS dateien (
+  id INTEGER PRIMARY KEY,
+  firma_id INTEGER NOT NULL REFERENCES firmen(id) ON DELETE CASCADE,
+  datei TEXT NOT NULL, original TEXT NOT NULL, groesse INTEGER NOT NULL, erstellt TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS einstellungen (schluessel TEXT PRIMARY KEY, wert TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS sitzungen (token_hash TEXT PRIMARY KEY, ablauf REAL NOT NULL);
 '''
@@ -99,9 +110,17 @@ def db():
 
 def einrichten():
     DB.parent.mkdir(parents=True, exist_ok=True)
+    DATEIEN.mkdir(parents=True, exist_ok=True)
     with db() as con:
         con.execute('PRAGMA journal_mode = WAL')
         con.executescript(SCHEMA)
+        # Spalten, die später dazukamen
+        vorhanden = {r['name'] for r in con.execute('PRAGMA table_info(firmen)')}
+        for spalte, art in (('entwurf_status', "TEXT NOT NULL DEFAULT 'fehlt'"), ('entwurf_link', "TEXT DEFAULT ''"),
+                            ('empfohlen_von_id', 'INTEGER REFERENCES firmen(id) ON DELETE SET NULL'),
+                            ('bonus_erledigt', 'INTEGER NOT NULL DEFAULT 0')):
+            if spalte not in vorhanden:
+                con.execute(f'ALTER TABLE firmen ADD COLUMN {spalte} {art}')
         for k, v in EINSTELLUNGEN.items():
             con.execute('INSERT OR IGNORE INTO einstellungen VALUES (?, ?)', (k, v))
     os.chmod(DB, 0o600)
@@ -187,6 +206,18 @@ def positionen_pruefen(roh):
     return aus
 
 
+def datei_art(kopf):
+    if kopf[:3] == b'\xff\xd8\xff':
+        return 'jpg'
+    if kopf[:8] == b'\x89PNG\r\n\x1a\n':
+        return 'png'
+    if kopf[:4] == b'RIFF' and kopf[8:12] == b'WEBP':
+        return 'webp'
+    if kopf[:5] == b'%PDF-':
+        return 'pdf'
+    return None
+
+
 def summe(beleg):
     pos = json.loads(beleg['positionen']) if isinstance(beleg['positionen'], str) else beleg['positionen']
     s = round(sum(p['menge'] * p['preis'] for p in pos), 2)
@@ -235,7 +266,13 @@ def uebersicht(con):
         if b['status'] == 'gestellt':
             offen_rechnungen += zahl
     grenze = betrag(con.execute("SELECT wert FROM einstellungen WHERE schluessel='umsatzgrenze'").fetchone()['wert'])
-    return {'faellig': faellig, 'bald': bald, 'stufen': stufen,
+    entwuerfe_offen = [dict(r) for r in con.execute(
+        "SELECT id, name, stufe, entwurf_status FROM firmen WHERE entwurf_status IN ('fehlt','in_arbeit') "
+        "AND stufe IN ('kontakt','gespraech','angebot') ORDER BY entwurf_status DESC, geaendert DESC")]
+    boni = [dict(r) for r in con.execute(
+        "SELECT f.id, f.name, e.id AS von_id, e.name AS von FROM firmen f JOIN firmen e ON e.id = f.empfohlen_von_id "
+        "WHERE f.stufe = 'gewonnen' AND f.bonus_erledigt = 0 ORDER BY f.geaendert DESC")]
+    return {'faellig': faellig, 'bald': bald, 'stufen': stufen, 'entwuerfe_offen': entwuerfe_offen, 'boni': boni,
             'pipeline_einmalig': offen['e'], 'pipeline_monatlich': offen['m'],
             'monatlich': monatlich, 'umsatz_jahr': round(umsatz, 2), 'jahr': jahr,
             'offene_rechnungen': round(offen_rechnungen, 2), 'grenze': grenze}
@@ -363,6 +400,12 @@ class Handler(BaseHTTPRequestHandler):
                 raise Fehler(401, 'Bitte anmelden')
             if pfad == '/api/logout' and methode == 'POST':
                 return self._logout()
+            m = re.fullmatch(r'/api/firmen/(\d+)/dateien', pfad)
+            if m and methode == 'POST':
+                return self._hochladen(int(m.group(1)))
+            m = re.fullmatch(r'/api/dateien/(\d+)', pfad)
+            if m:
+                return self._datei(methode, int(m.group(1)))
             self._api(methode, pfad)
         except Fehler as f:
             self._json(f.code, {'fehler': f.text})
@@ -371,6 +414,43 @@ class Handler(BaseHTTPRequestHandler):
         except Exception as f:
             print(f'Fehler bei {methode} {pfad}: {f!r}', flush=True)
             self._json(500, {'fehler': 'Serverfehler'})
+
+    def _hochladen(self, fid):
+        laenge = int(self.headers.get('Content-Length') or 0)
+        if laenge <= 0 or laenge > MAX_DATEI:
+            raise Fehler(413, 'Datei zu groß (höchstens 15 MB)')
+        from urllib.parse import unquote
+        original = re.sub(r'[\x00-\x1f/\\]', '', unquote(self.headers.get('X-Dateiname', 'datei')))[:120] or 'datei'
+        daten = self.rfile.read(laenge)
+        art = datei_art(daten[:12])
+        if not art:
+            raise Fehler(415, 'Nur Bilder (JPG, PNG, WebP) oder PDF')
+        with db() as con:
+            if not con.execute('SELECT 1 FROM firmen WHERE id = ?', (fid,)).fetchone():
+                raise Fehler(404, 'Firma nicht gefunden')
+            name = f'{secrets.token_hex(12)}.{art}'
+            (DATEIEN / name).write_bytes(daten)
+            os.chmod(DATEIEN / name, 0o600)
+            cur = con.execute('INSERT INTO dateien (firma_id, datei, original, groesse, erstellt) VALUES (?, ?, ?, ?, ?)',
+                              (fid, name, original, laenge, jetzt()))
+            con.execute('INSERT INTO verlauf (firma_id, zeit, text) VALUES (?, ?, ?)', (fid, jetzt(), f'Datei hochgeladen: {original}'))
+        self._json(201, {'id': cur.lastrowid})
+
+    def _datei(self, methode, did):
+        with db() as con:
+            r = con.execute('SELECT * FROM dateien WHERE id = ?', (did,)).fetchone()
+            if not r or not DATEI_NAME.match(r['datei']):
+                raise Fehler(404, 'Datei nicht gefunden')
+            if methode == 'DELETE':
+                (DATEIEN / r['datei']).unlink(missing_ok=True)
+                con.execute('DELETE FROM dateien WHERE id = ?', (did,))
+                return self._json(200, {'ok': True})
+        if methode != 'GET':
+            raise Fehler(405, 'Nicht erlaubt')
+        art = r['datei'].rsplit('.', 1)[1]
+        ascii_name = re.sub(r'[^A-Za-z0-9._-]', '_', r['original'])
+        self._senden(200, (DATEIEN / r['datei']).read_bytes(), DATEI_TYP[art],
+                     {'Content-Disposition': f'inline; filename="{ascii_name}"', 'Cache-Control': 'private, max-age=3600'})
 
     def _login(self):
         ip = self._ip()
@@ -435,9 +515,18 @@ class Handler(BaseHTTPRequestHandler):
                     'SELECT * FROM verlauf WHERE firma_id = ? ORDER BY zeit DESC, id DESC', (fid,))]
                 firma['belege'] = [self._beleg_kurz(dict(r)) for r in con.execute(
                     'SELECT * FROM belege WHERE firma_id = ? ORDER BY erstellt DESC', (fid,))]
+                firma['empfehlungen'] = [dict(r) for r in con.execute(
+                    'SELECT id, name, stufe, bonus_erledigt, wert_einmalig FROM firmen WHERE empfohlen_von_id = ? ORDER BY name', (fid,))]
+                firma['empfohlen_von_name'] = (con.execute('SELECT name FROM firmen WHERE id = ?', (firma['empfohlen_von_id'],)).fetchone() or {'name': ''})['name'] if firma['empfohlen_von_id'] else ''
+                firma['dateien'] = [{k: r[k] for k in ('id', 'original', 'groesse', 'erstellt')} | {'art': r['datei'].rsplit('.', 1)[1]}
+                                    for r in con.execute('SELECT * FROM dateien WHERE firma_id = ? ORDER BY erstellt DESC', (fid,))]
                 return self._json(200, firma)
             if m == 'PUT':
                 d = self._firma_daten(self._body())
+                if d.get('empfohlen_von_id') == fid:
+                    raise ValueError('Eine Firma kann sich nicht selbst empfehlen')
+                if d.get('empfohlen_von_id') and not con.execute('SELECT 1 FROM firmen WHERE id = ?', (d['empfohlen_von_id'],)).fetchone():
+                    raise ValueError('Empfehlende Firma unbekannt')
                 if 'stufe' in d and d['stufe'] != firma['stufe']:
                     con.execute('INSERT INTO verlauf (firma_id, zeit, text) VALUES (?, ?, ?)',
                                 (fid, jetzt(), f"Stufe: {firma['stufe']} → {d['stufe']}"))
@@ -448,6 +537,9 @@ class Handler(BaseHTTPRequestHandler):
                 if con.execute("SELECT 1 FROM belege WHERE firma_id = ? AND status != 'entwurf'", (fid,)).fetchone():
                     raise Fehler(409, 'Firma hat gestellte Belege und bleibt deshalb erhalten.')
                 con.execute("DELETE FROM belege WHERE firma_id = ? AND status = 'entwurf'", (fid,))
+                for r in con.execute('SELECT datei FROM dateien WHERE firma_id = ?', (fid,)):
+                    if DATEI_NAME.match(r['datei']):
+                        (DATEIEN / r['datei']).unlink(missing_ok=True)
                 con.execute('DELETE FROM firmen WHERE id = ?', (fid,))
                 return self._json(200, {'ok': True})
         if rest[1:] == ['verlauf'] and m == 'POST':
@@ -470,6 +562,19 @@ class Handler(BaseHTTPRequestHandler):
             elif k == 'stufe':
                 if v not in STUFEN:
                     raise ValueError('Unbekannte Stufe')
+                d[k] = v
+            elif k == 'empfohlen_von_id':
+                d[k] = int(v) if str(v or '').isdigit() else None
+            elif k == 'bonus_erledigt':
+                d[k] = 1 if v in (1, True, '1', 'true') else 0
+            elif k == 'entwurf_status':
+                if v not in ENTWURF_STATUS:
+                    raise ValueError('Unbekannter Entwurf-Status')
+                d[k] = v
+            elif k == 'entwurf_link':
+                v = str(v or '').strip()[:500]
+                if v and not re.match(r'^https?://', v):
+                    v = 'https://' + v
                 d[k] = v
             elif k == 'faellig_am':
                 if not datum_ok(v):
