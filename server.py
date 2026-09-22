@@ -96,6 +96,12 @@ CREATE TABLE IF NOT EXISTS dateien (
   firma_id INTEGER NOT NULL REFERENCES firmen(id) ON DELETE CASCADE,
   datei TEXT NOT NULL, original TEXT NOT NULL, groesse INTEGER NOT NULL, erstellt TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS zugaenge (
+  id INTEGER PRIMARY KEY,
+  firma_id INTEGER NOT NULL REFERENCES firmen(id) ON DELETE CASCADE,
+  dienst TEXT NOT NULL, url TEXT DEFAULT '', konto TEXT DEFAULT '', ablage TEXT DEFAULT '', notiz TEXT DEFAULT '',
+  erstellt TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS einstellungen (schluessel TEXT PRIMARY KEY, wert TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS sitzungen (token_hash TEXT PRIMARY KEY, ablauf REAL NOT NULL);
 '''
@@ -216,6 +222,19 @@ def datei_art(kopf):
     if kopf[:5] == b'%PDF-':
         return 'pdf'
     return None
+
+
+ZUGANG_FELDER = ('dienst', 'url', 'konto', 'ablage', 'notiz')
+
+
+def zugang_daten(roh):
+    """Zugänge ohne Passwörter: die gehören in einen Passwort-Manager."""
+    d = {k: str(roh.get(k) or '').strip()[:300] for k in ZUGANG_FELDER if k in roh}
+    if 'dienst' in d and not d['dienst']:
+        raise ValueError('Dienst fehlt')
+    if d.get('url') and not re.match(r'^https?://', d['url']):
+        d['url'] = 'https://' + d['url']
+    return d
 
 
 def summe(beleg):
@@ -492,6 +511,18 @@ class Handler(BaseHTTPRequestHandler):
                 return self._firmen(con, m, teile[1:])
             if teile[0] == 'belege':
                 return self._belege(con, m, teile[1:])
+            if teile[0] == 'zugaenge' and len(teile) == 2 and teile[1].isdigit():
+                zid = int(teile[1])
+                if not con.execute('SELECT 1 FROM zugaenge WHERE id = ?', (zid,)).fetchone():
+                    raise Fehler(404, 'Zugang nicht gefunden')
+                if m == 'PUT':
+                    d = zugang_daten(self._body())
+                    if d:
+                        con.execute(f'UPDATE zugaenge SET {", ".join(k + " = ?" for k in d)} WHERE id = ?', [*d.values(), zid])
+                    return self._json(200, {'ok': True})
+                if m == 'DELETE':
+                    con.execute('DELETE FROM zugaenge WHERE id = ?', (zid,))
+                    return self._json(200, {'ok': True})
         raise Fehler(404, 'Unbekannt')
 
     def _firmen(self, con, m, rest):
@@ -518,6 +549,8 @@ class Handler(BaseHTTPRequestHandler):
                 firma['empfehlungen'] = [dict(r) for r in con.execute(
                     'SELECT id, name, stufe, bonus_erledigt, wert_einmalig FROM firmen WHERE empfohlen_von_id = ? ORDER BY name', (fid,))]
                 firma['empfohlen_von_name'] = (con.execute('SELECT name FROM firmen WHERE id = ?', (firma['empfohlen_von_id'],)).fetchone() or {'name': ''})['name'] if firma['empfohlen_von_id'] else ''
+                firma['zugaenge'] = [dict(r) for r in con.execute(
+                    'SELECT * FROM zugaenge WHERE firma_id = ? ORDER BY dienst', (fid,))]
                 firma['dateien'] = [{k: r[k] for k in ('id', 'original', 'groesse', 'erstellt')} | {'art': r['datei'].rsplit('.', 1)[1]}
                                     for r in con.execute('SELECT * FROM dateien WHERE firma_id = ? ORDER BY erstellt DESC', (fid,))]
                 return self._json(200, firma)
@@ -542,6 +575,14 @@ class Handler(BaseHTTPRequestHandler):
                         (DATEIEN / r['datei']).unlink(missing_ok=True)
                 con.execute('DELETE FROM firmen WHERE id = ?', (fid,))
                 return self._json(200, {'ok': True})
+        if rest[1:] == ['zugaenge'] and m == 'POST':
+            d = zugang_daten(self._body())
+            if not d.get('dienst'):
+                raise ValueError('Dienst fehlt')
+            con.execute(f'INSERT INTO zugaenge (firma_id, {", ".join(d)}, erstellt) VALUES (?, {", ".join("?" * len(d))}, ?)',
+                        [fid, *d.values(), jetzt()])
+            con.execute('INSERT INTO verlauf (firma_id, zeit, text) VALUES (?, ?, ?)', (fid, jetzt(), f"Zugang eingetragen: {d['dienst']}"))
+            return self._json(201, {'ok': True})
         if rest[1:] == ['verlauf'] and m == 'POST':
             text = str(self._body().get('text', '')).strip()[:4000]
             if not text:

@@ -284,6 +284,29 @@ async function seiteFirma(id) {
           : x.bonus_erledigt ? h('span', { class: 'chip chip--gruen' }, 'Bonus erledigt')
           : h('button', { class: 'btn', onclick: async () => { await api('PUT', 'firmen/' + x.id, { bonus_erledigt: 1 }); seiteFirma(id); } }, 'Bonus fällig · erledigt?'))))
         : h('p', { class: 'leer' }, 'Hat noch niemanden empfohlen.')),
+    (() => {
+      const neuFeld = (k, platz) => h('input', { name: k, placeholder: platz, 'aria-label': platz });
+      const formular = h('form', { class: 'zugang-neu', hidden: true, onsubmit: async (e) => {
+        e.preventDefault();
+        try { await api('POST', `firmen/${id}/zugaenge`, Object.fromEntries(new FormData(e.target))); seiteFirma(id); }
+        catch (err) { alert(err.message); }
+      } },
+        neuFeld('dienst', 'Dienst (z. B. INWX)'), neuFeld('konto', 'Konto / Kundennummer'),
+        neuFeld('url', 'Login-Adresse'), neuFeld('ablage', 'Passwort liegt in … (z. B. Bitwarden)'),
+        neuFeld('notiz', 'Notiz'),
+        h('button', { class: 'btn btn--voll', type: 'submit' }, 'Speichern'));
+      return h('div', { class: 'karte raster' }, h('h2', {}, 'Zugänge'),
+        h('p', { class: 'dim', style: 'font-size:.86rem' }, 'Welche Konten du für diese Firma betreust. Passwörter gehören in einen Passwort-Manager, nicht hierher.'),
+        f.zugaenge.length ? h('ul', { class: 'liste' }, f.zugaenge.map((z) => h('li', {},
+          h('div', {}, h('b', {}, z.url ? h('a', { href: z.url, target: '_blank', rel: 'noopener' }, z.dienst + ' ↗') : z.dienst),
+            h('div', { class: 'dim', style: 'font-size:.86rem' }, [z.konto, z.ablage && 'Passwort: ' + z.ablage, z.notiz].filter(Boolean).join(' · '))),
+          h('button', { class: 'btn btn--leise', 'aria-label': 'Zugang löschen', onclick: async () => {
+            if (!confirm(`Zugang „${z.dienst}“ löschen?`)) return; await api('DELETE', 'zugaenge/' + z.id); seiteFirma(id);
+          } }, '×'))))
+          : h('p', { class: 'leer' }, 'Noch keine eingetragen.'),
+        formular,
+        h('button', { class: 'btn', style: 'justify-self:start', onclick: (e) => { formular.hidden = false; e.target.hidden = true; formular.querySelector('input').focus(); } }, '+ Zugang eintragen'));
+    })(),
     h('div', { class: 'karte raster' }, h('h2', {}, 'Entwurf'),
       h('div', { class: 'felder' },
         h('div', { class: 'feld' }, h('label', { for: 'f-entwurf_status' }, 'Status'),

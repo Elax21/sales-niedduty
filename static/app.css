@@ -122,6 +122,12 @@ h3 { font-size: 1rem; font-weight: 600; }
 .suche { max-width: 320px; }
 .gespeichert { font-size: .8rem; color: var(--gruen); min-height: 1.2em; }
 
+/* ---------- Zugänge ---------- */
+.zugang-neu { display: grid; gap: 8px; grid-template-columns: 1fr 1fr; }
+.zugang-neu input { padding: 8px 10px; border: 1px solid var(--linie-hi); border-radius: 7px; background: var(--flaeche); }
+.zugang-neu button { justify-self: start; }
+@media (max-width: 560px) { .zugang-neu { grid-template-columns: 1fr; } }
+
 /* ---------- Pipeline ---------- */
 .pipeline { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(230px, 1fr); gap: 12px; overflow-x: auto; padding-bottom: 12px;
   scroll-snap-type: x proximity; }
