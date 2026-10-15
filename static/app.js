@@ -65,6 +65,7 @@ const ICON = {
   pipeline: 'M4 5h4v14H4zM10 5h4v9h-4zM16 5h4v5h-4z',
   firmen: 'M4 20V6l8-3 8 3v14M9 20v-5h6v5M8 9h1M15 9h1M8 12h1M15 12h1',
   belege: 'M7 3h8l4 4v14H7zM15 3v4h4M10 12h6M10 16h6',
+  seiten: 'M3 5h18v14H3zM3 9h18M7 7h.01M10 7h.01',
   einstellungen: 'M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM19 12l2-1-1-3-2 .3-1.5-1.5L17 5l-3-1-1 2h-2l-1-2-3 1 .5 2L6 8.5 4 8l-1 3 2 1v0l-2 1 1 3 2-.3L7.5 17 7 19l3 1 1-2h2l1 2 3-1-.5-2 1.5-1.5 2 .3 1-3z',
 };
 
@@ -84,7 +85,7 @@ async function api(methode, pfad, daten) {
 
 // ---------- Rahmen ----------
 function rahmen(aktiv, ...inhalt) {
-  const nav = [['uebersicht', 'Übersicht'], ['pipeline', 'Pipeline'], ['firmen', 'Firmen'], ['belege', 'Belege'], ['einstellungen', 'Einstellungen']];
+  const nav = [['uebersicht', 'Übersicht'], ['pipeline', 'Pipeline'], ['firmen', 'Firmen'], ['seiten', 'Seiten'], ['belege', 'Belege'], ['einstellungen', 'Einstellungen']];
   app.replaceChildren(h('div', { class: 'rahmen' },
     h('aside', { class: 'leiste' },
       h('a', { class: 'marke', href: '#/uebersicht' }, h('img', { src: '/logo/zeichen-64.svg', alt: '' }), 'Sales'),
@@ -184,10 +185,65 @@ async function seitePipeline() {
     });
     return spalte;
   });
+  const knopf = h('button', { class: 'btn', type: 'button', onclick: () => maximal(!document.body.classList.contains('maximal')) });
+  const maximal = (an) => {
+    document.body.classList.toggle('maximal', an);
+    knopf.textContent = an ? 'Normale Ansicht' : 'Maximal-Ansicht';
+    knopf.title = an ? 'Zurück (Esc)' : 'Alle Spalten auf einen Blick, ohne Seitenleiste';
+    try { localStorage.setItem('pipeline-maximal', an ? '1' : ''); } catch { /* egal */ }
+  };
   rahmen('pipeline',
     kopf('Pipeline', 'Karten zwischen den Spalten verschieben. Auf dem Handy die Stufe in der Firma ändern.',
-      h('a', { class: 'btn btn--voll', href: '#/firmen/neu' }, 'Neue Firma')),
+      knopf, h('a', { class: 'btn btn--voll', href: '#/firmen/neu' }, 'Neue Firma')),
     h('div', { class: 'pipeline' }, spalten));
+  let gemerkt = false;
+  try { gemerkt = localStorage.getItem('pipeline-maximal') === '1'; } catch { /* egal */ }
+  maximal(gemerkt);
+}
+// Maximal-Ansicht gilt nur für die Pipeline: beim Verlassen und mit Esc aus
+addEventListener('hashchange', () => { if (!location.hash.startsWith('#/pipeline')) document.body.classList.remove('maximal'); });
+addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && document.body.classList.contains('maximal')) {
+    document.body.classList.remove('maximal');
+    try { localStorage.setItem('pipeline-maximal', ''); } catch { /* egal */ }
+    if (location.hash.startsWith('#/pipeline')) seitePipeline();
+  }
+});
+
+// ---------- Seiten unter niedduty.de/fuer/ ----------
+const fuerKunde = (pfad) => (pfad || '').match(/\/fuer\/([^/?#]+)/)?.[1] || '';
+async function seiteSeiten() {
+  const [liste, firmen] = await Promise.all([api('GET', 'fuer'), api('GET', 'firmen')]);
+  const firmaZu = (kunde) => firmen.find((f) => fuerKunde(f.entwurf_link) === kunde);
+  const name = (kunde) => kunde.split('-').map((w) => w[0].toUpperCase() + w.slice(1)).join(' ');
+  const karten = liste.kunden
+    .slice().sort((a, b) => b.geaendert.localeCompare(a.geaendert))
+    .map((k) => {
+      const firma = firmaZu(k.kunde);
+      return h('div', { class: 'karte seiten-kunde' },
+        h('div', { class: 'seiten-kopf' },
+          h('h2', {}, firma ? h('a', { href: '#/firmen/' + firma.id }, firma.name) : name(k.kunde)),
+          h('span', { class: 'mono dim' }, 'geändert ' + datum(k.geaendert))),
+        h('ul', { class: 'seiten-liste' }, k.seiten.map((s) => h('li', {},
+          h('div', {},
+            h('a', { href: s.url, target: '_blank', rel: 'noopener', class: 'seiten-titel' }, s.titel, ' ↗'),
+            h('div', { class: 'mono dim seiten-pfad' }, '/fuer/' + s.pfad),
+            s.beschreibung ? h('p', { class: 'dim seiten-text' }, s.beschreibung) : null,
+            s.unterseiten.length ? h('div', { class: 'seiten-unter' }, s.unterseiten.map((u) =>
+              h('a', { href: s.url + u, target: '_blank', rel: 'noopener' }, u.replace('.html', '')))) : null),
+          h('div', { class: 'seiten-status' },
+            h('span', { class: 'chip ' + (s.online ? 'chip--gruen' : 'chip--rot') }, s.online ? 'online' : 'nur lokal'),
+            h('button', { class: 'btn btn--leise', type: 'button', title: 'Link kopieren', onclick: async (e) => {
+              await navigator.clipboard.writeText(s.url).catch(() => {});
+              e.target.textContent = 'kopiert'; setTimeout(() => { e.target.textContent = 'Link'; }, 1400);
+            } }, 'Link'))))),
+        !firma ? h('p', { class: 'dim seiten-hinweis' }, 'Keiner Firma zugeordnet. In der Firma unter „Link zum Entwurf“ eine Adresse mit /fuer/' + k.kunde + '/ eintragen.') : null);
+    });
+  rahmen('seiten',
+    kopf('Seiten', liste.erstellt ? `Alles unter niedduty.de/fuer/, Stand ${datum(liste.erstellt)} ${liste.erstellt.slice(11, 16)}` : 'Noch keine Liste hochgeladen'),
+    karten.length ? h('div', { class: 'seiten-raster' }, karten)
+      : h('div', { class: 'karte' }, h('p', { class: 'leer' }, 'Keine Liste gefunden. Im niedduty-Repo „python3 werkzeug/fuer-liste.py --hochladen“ ausführen.')),
+    h('p', { class: 'dim', style: 'font-size:.85rem;margin-top:16px' }, 'Die Liste kommt aus dem niedduty-Repo: nach jedem Hochladen einer /fuer-Seite „python3 werkzeug/fuer-liste.py --hochladen“.'));
 }
 
 // ---------- Firmen ----------
@@ -256,7 +312,11 @@ async function seiteFirma(id) {
         h('select', { id: 'f-empfohlen_von_id', name: 'empfohlen_von_id', onchange: (e) => speichern({ empfohlen_von_id: e.target.value }) },
           h('option', { value: '' }, '—'),
           alle.filter((x) => String(x.id) !== String(id)).map((x) => h('option', { value: x.id, selected: f.empfohlen_von_id === x.id }, x.name)))),
-      eingabe('faellig_am', 'Fällig am', 'date')),
+      eingabe('faellig_am', 'Fällig am', 'date'),
+      h('label', { style: 'display:flex;gap:8px;align-items:center;align-self:end;min-height:44px' },
+        h('input', { type: 'checkbox', name: 'duzen', checked: !!f.duzen,
+          onchange: (e) => speichern({ duzen: e.target.checked ? 1 : 0 }) }),
+        'Per du (Angebote und Rechnungen)')),
     h('div', { class: 'feld', style: 'margin-top:12px' }, h('label', { for: 'f-notiz' }, 'Notiz'),
       h('textarea', { id: 'f-notiz', name: 'notiz', onchange: (e) => speichern({ notiz: e.target.value }) }, f.notiz || '')),
     neu ? h('div', { style: 'margin-top:14px' }, h('button', { class: 'btn btn--voll', type: 'submit' }, 'Anlegen')) : null,
@@ -407,17 +467,28 @@ async function seiteBeleg(id) {
   function zeichneVorschau() {
     const a = b.absender;
     const [summe, zahlbetrag] = summen();
+    const du = !!(b.firma && b.firma.duzen);
     const fakten = istRechnung
       ? [['Rechnungsnummer', b.nummer || 'Entwurf'], ['Rechnungsdatum', datum(b.datum)],
         (b.leistung_von || b.leistung_bis) && ['Leistungszeitraum', [datum(b.leistung_von), datum(b.leistung_bis)].filter(Boolean).join(' – ')],
         ['Kundennummer', 'K-' + String(b.firma_id).padStart(3, '0')]]
       : [['Angebotsnummer', b.nummer || 'Entwurf'], ['Datum', datum(b.datum)], ['Gültig bis', datum(b.zahlbar_bis)],
         ['Kundennummer', 'K-' + String(b.firma_id).padStart(3, '0')]];
+    // Zeilen „Stichwort: Text“ aus dem Text unten werden zur Tabelle, der Rest bleibt Fließtext
+    const zeilenUnten = (b.text_unten || '').split('\n').map((z) => z.trim()).filter(Boolean);
+    // Zeilen, die mit „|“ beginnen, bilden eine Vergleichstabelle; die erste ist die Kopfzeile
+    const istTabelle = (z) => z.startsWith('|');
+    const tabelle = zeilenUnten.filter(istTabelle).map((z) => z.replace(/^\|/, '').split('|').map((x) => x.trim()));
+    const istBedingung = (z) => !istTabelle(z) && /^[^:]{2,24}:\s+\S/.test(z);
+    const bedingungen = zeilenUnten.filter(istBedingung).map((z) => {
+      const i = z.indexOf(':');
+      return [z.slice(0, i), z.slice(i + 1).trim()];
+    });
     const hinweise = [
       a.kleinunternehmer === '1' ? 'Gemäß § 19 UStG wird keine Umsatzsteuer berechnet.' : null,
-      istRechnung && b.zahlbar_bis ? `Bitte überweisen Sie den Betrag bis zum ${datum(b.zahlbar_bis)} unter Angabe der Rechnungsnummer${b.nummer ? ' ' + b.nummer : ''}.` : null,
-      !istRechnung ? 'Ich freue mich auf Ihre Rückmeldung.' : null,
-      b.text_unten || null,
+      istRechnung && b.zahlbar_bis ? `Bitte überweise${du ? '' : 'n Sie'} den Betrag bis zum ${datum(b.zahlbar_bis)} unter Angabe der Rechnungsnummer${b.nummer ? ' ' + b.nummer : ''}.` : null,
+      !istRechnung ? (du ? 'Ich freue mich auf deine Rückmeldung.' : 'Ich freue mich auf Ihre Rückmeldung.') : null,
+      zeilenUnten.filter((z) => !istBedingung(z) && !istTabelle(z)).join('\n') || null,
     ].filter(Boolean).join('\n');
     fuellen(vorschau,
       h('div', { class: 'k' }, h('img', { src: '/logo/wortmarke-hell.svg', alt: 'Niedduty' }),
@@ -430,17 +501,28 @@ async function seiteBeleg(id) {
       b.text_oben ? h('p', { class: 'oben' }, b.text_oben) : null,
       h('table', {},
         h('thead', {}, h('tr', {}, h('th', { class: 'nr' }, 'Pos.'), h('th', {}, 'Leistung'), h('th', { class: 'me' }, 'Menge'), h('th', { class: 'g' }, 'Einzelpreis'), h('th', { class: 'g' }, 'Betrag'))),
-        h('tbody', {}, b.positionen.map((p, i) => h('tr', {},
-          h('td', { class: 'nr' }, i + 1),
-          h('td', {}, p.titel, p.beschreibung ? h('small', {}, p.beschreibung) : null),
-          h('td', { class: 'me' }, p.einheit === 'pauschal' ? 'pauschal' : `${String(p.menge).replace('.', ',')} ${p.einheit}`),
-          h('td', { class: 'g' }, zahl(p.preis)), h('td', { class: 'g' }, zahl((+p.menge || 0) * (+p.preis || 0))))))),
+        // Beschreibung mit Zeilenumbrüchen wird zur Liste über die volle Breite, in einer eigenen Zeile
+        h('tbody', {}, b.positionen.map((p, i) => {
+          const liste = (p.beschreibung || '').includes('\n');
+          const zeile = h('tr', { class: liste ? 'mit-liste' : null },
+            h('td', { class: 'nr' }, i + 1),
+            h('td', {}, p.titel, p.beschreibung && !liste ? h('small', {}, p.beschreibung) : null),
+            h('td', { class: 'me' }, p.einheit === 'pauschal' ? 'pauschal' : `${String(p.menge).replace('.', ',')} ${p.einheit}`),
+            h('td', { class: 'g' }, zahl(p.preis)), h('td', { class: 'g' }, zahl((+p.menge || 0) * (+p.preis || 0))));
+          return liste ? [zeile, h('tr', {}, h('td', { class: 'nr' }), h('td', { colspan: 4 },
+            h('ul', { class: 'punkte' }, p.beschreibung.split('\n').filter((x) => x.trim()).map((x) => h('li', {}, x.trim())))))] : zeile;
+        }))),
       h('div', { class: 'sum' },
         b.anzahlung_betrag ? [
           h('div', {}, h('span', {}, 'Summe der Leistungen'), h('span', {}, zahl(summe))),
           h('div', { class: 'ab' }, h('span', {}, b.anzahlung_text || 'abzüglich Anzahlung'), h('span', {}, '− ' + zahl(b.anzahlung_betrag))),
         ] : null,
         h('div', { class: 'of' }, h('span', {}, istRechnung ? (b.anzahlung_betrag ? 'Offener Betrag' : 'Gesamtbetrag') : 'Angebotssumme'), h('span', {}, zahl(zahlbetrag)))),
+      tabelle.length > 1 ? h('table', { class: 'vgl' },
+        h('thead', {}, h('tr', {}, tabelle[0].map((x) => h('th', {}, x)))),
+        h('tbody', {}, tabelle.slice(1).map((r) => h('tr', {}, r.map((x) => h('td', {}, x)))))) : null,
+      bedingungen.length ? h('div', { class: 'bed' }, h('h2', {}, 'Bedingungen'),
+        h('dl', {}, bedingungen.map(([k, v]) => [h('dt', {}, k), h('dd', {}, v)]))) : null,
       h('p', { class: 'hin' }, hinweise),
       h('div', { class: 'fu' },
         h('div', {}, h('b', {}, 'Niedduty'), h('br'), a.name.split('·').pop().trim(), h('br'), a.strasse, h('br'), a.plz_ort),
@@ -559,6 +641,7 @@ async function route() {
     if (teile[0] === 'pipeline') await seitePipeline();
     else if (teile[0] === 'firmen' && teile[1]) await seiteFirma(teile[1]);
     else if (teile[0] === 'firmen') await seiteFirmen();
+    else if (teile[0] === 'seiten') await seiteSeiten();
     else if (teile[0] === 'belege' && teile[1]) await seiteBeleg(teile[1]);
     else if (teile[0] === 'belege') await seiteBelege();
     else if (teile[0] === 'einstellungen') await seiteEinstellungen();

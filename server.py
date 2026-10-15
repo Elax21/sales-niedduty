@@ -37,6 +37,8 @@ LOGO = pathlib.Path(os.environ.get('SALES_LOGO', HIER / 'logo'))
 DB = pathlib.Path(os.environ.get('SALES_DB', '/var/lib/niedduty-sales/sales.db'))
 PORT = int(os.environ.get('SALES_PORT', '8083'))
 DEV = os.environ.get('SALES_DEV') == '1'
+# Liste der Seiten unter niedduty.de/fuer/, erzeugt von werkzeug/fuer-liste.py im niedduty-Repo
+FUER_LISTE = pathlib.Path(os.environ.get('SALES_FUER_LISTE', '/var/lib/niedduty-sales/fuer-seiten.json'))
 PASSWORT_HASH = os.environ.get('SALES_PASSWORT_HASH', '')
 
 DATEIEN = DB.parent / 'dateien'
@@ -53,7 +55,7 @@ BELEG_ARTEN = {'angebot', 'rechnung'}
 FIRMEN_FELDER = ['name', 'ansprechpartner', 'telefon', 'email', 'website', 'strasse', 'plz_ort',
                  'branche', 'quelle', 'empfohlen_von', 'stufe', 'wert_einmalig', 'wert_monatlich',
                  'naechster_schritt', 'faellig_am', 'notiz', 'entwurf_status', 'entwurf_link',
-                 'empfohlen_von_id', 'bonus_erledigt']
+                 'empfohlen_von_id', 'bonus_erledigt', 'duzen']
 EINSTELLUNGEN = {
     'name': 'Niedduty · Alessandro Nieddu', 'strasse': 'Rosenstraße 1b-c', 'plz_ort': '59227 Ahlen',
     'telefon': '+49 1517 4456084', 'email': 'info@niedduty.de', 'web': 'niedduty.de',
@@ -124,7 +126,8 @@ def einrichten():
         vorhanden = {r['name'] for r in con.execute('PRAGMA table_info(firmen)')}
         for spalte, art in (('entwurf_status', "TEXT NOT NULL DEFAULT 'fehlt'"), ('entwurf_link', "TEXT DEFAULT ''"),
                             ('empfohlen_von_id', 'INTEGER REFERENCES firmen(id) ON DELETE SET NULL'),
-                            ('bonus_erledigt', 'INTEGER NOT NULL DEFAULT 0')):
+                            ('bonus_erledigt', 'INTEGER NOT NULL DEFAULT 0'),
+                            ('duzen', 'INTEGER NOT NULL DEFAULT 0')):
             if spalte not in vorhanden:
                 con.execute(f'ALTER TABLE firmen ADD COLUMN {spalte} {art}')
         for k, v in EINSTELLUNGEN.items():
@@ -499,6 +502,13 @@ class Handler(BaseHTTPRequestHandler):
             if teile == ['uebersicht'] and m == 'GET':
                 return self._json(200, uebersicht(con))
 
+            if teile == ['fuer'] and m == 'GET':
+                try:
+                    liste = json.loads(FUER_LISTE.read_text(encoding='utf-8'))
+                except (OSError, ValueError):
+                    liste = {'erstellt': '', 'kunden': []}
+                return self._json(200, liste)
+
             if teile == ['einstellungen']:
                 if m == 'PUT':
                     d = self._body()
@@ -606,7 +616,7 @@ class Handler(BaseHTTPRequestHandler):
                 d[k] = v
             elif k == 'empfohlen_von_id':
                 d[k] = int(v) if str(v or '').isdigit() else None
-            elif k == 'bonus_erledigt':
+            elif k in ('bonus_erledigt', 'duzen'):
                 d[k] = 1 if v in (1, True, '1', 'true') else 0
             elif k == 'entwurf_status':
                 if v not in ENTWURF_STATUS:

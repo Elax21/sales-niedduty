@@ -20,6 +20,16 @@ Dann http://127.0.0.1:8083 öffnen. `sales.db` ist in `.gitignore`.
 cd /opt/niedduty-sales && sudo git pull && sudo systemctl restart niedduty-sales
 ```
 
+## Seiten (/fuer)
+
+Reiter „Seiten“ zeigt alle Seiten unter niedduty.de/fuer/. Die Liste erzeugt
+`werkzeug/fuer-liste.py --hochladen` im niedduty-Repo, sie liegt unter
+`/var/lib/niedduty-sales/fuer-seiten.json` (anders: `SALES_FUER_LISTE`).
+Zuordnung zur Firma über „Link zum Entwurf“ mit `/fuer/<kunde>/`.
+
+Pipeline: Knopf „Maximal-Ansicht“ blendet die Seitenleiste aus, alle Spalten
+passen nebeneinander, jede scrollt für sich. Esc schaltet zurück.
+
 ## Regeln
 
 - **Gestellte Belege sind gesperrt** (GoBD). Fehler: stornieren, neu anlegen.

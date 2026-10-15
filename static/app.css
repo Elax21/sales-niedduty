@@ -138,6 +138,36 @@ h3 { font-size: 1rem; font-weight: 600; }
 .kachel { display: block; background: var(--flaeche); border: 1px solid var(--linie); border-radius: 8px; padding: 10px 12px; margin-bottom: 8px;
   text-decoration: none; cursor: grab; }
 .kachel:hover { border-color: var(--linie-hi); }
+
+/* Maximal-Ansicht: ohne Seitenleiste, alle Spalten nebeneinander, jede scrollt für sich */
+body.maximal .rahmen { grid-template-columns: 1fr; }
+body.maximal .leiste { display: none; }
+body.maximal .inhalt { max-width: none; padding: 14px 16px 16px; height: 100vh; display: flex; flex-direction: column; }
+body.maximal .kopfzeile { margin-bottom: 10px; }
+body.maximal .kopfzeile h1 { font-size: 1.3rem; }
+body.maximal .kopfzeile .dim { display: none; }
+body.maximal .pipeline { flex: 1; min-height: 0; grid-auto-flow: row; grid-template-columns: repeat(6, minmax(0, 1fr)); overflow: hidden; padding-bottom: 0; gap: 8px; }
+body.maximal .spalte { min-height: 0; overflow-y: auto; padding: 8px; }
+body.maximal .spalte h3 { position: sticky; top: -8px; background: var(--flaeche-2); padding: 6px 4px 8px; margin: -8px 0 4px; z-index: 1; font-size: .82rem; }
+body.maximal .kachel { padding: 7px 9px; margin-bottom: 6px; font-size: .85rem; }
+body.maximal .kachel .schritt { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin: 2px 0; }
+body.maximal .kachel .fuss { font-size: .75rem; }
+@media (max-width: 900px) { body.maximal .pipeline { grid-template-columns: repeat(3, minmax(0, 1fr)); overflow-y: auto; } body.maximal .inhalt { height: auto; } }
+
+/* ---------- Seiten (/fuer) ---------- */
+.seiten-raster { display: grid; gap: 14px; }
+.seiten-kopf { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 6px; }
+.seiten-kopf h2 { margin: 0; }
+.seiten-kopf h2 a { text-decoration: none; }
+.seiten-liste { list-style: none; margin: 0; padding: 0; }
+.seiten-liste li { display: flex; justify-content: space-between; gap: 16px; padding: 12px 0; border-top: 1px solid var(--linie); }
+.seiten-titel { font-weight: 600; text-decoration: none; }
+.seiten-titel:hover { text-decoration: underline; }
+.seiten-pfad { font-size: .78rem; margin-top: 2px; }
+.seiten-text { font-size: .86rem; margin: 6px 0 0; max-width: 70ch; }
+.seiten-unter { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 6px; font-size: .82rem; }
+.seiten-status { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; flex: none; }
+.seiten-hinweis { font-size: .82rem; margin: 8px 0 0; }
 .kachel b { display: block; font-weight: 600; }
 .kachel .schritt { font-size: .84rem; color: var(--dim); margin-top: 2px; }
 .kachel .fuss { display: flex; justify-content: space-between; margin-top: 8px; font-size: .78rem; }
@@ -194,7 +224,23 @@ h3 { font-size: 1rem; font-weight: 600; }
 .a4 .sum span:last-child { font-family: var(--mono); white-space: nowrap; padding-left: 4mm; }
 .a4 .sum .ab { color: var(--d); }
 .a4 .sum .of { margin-top: 1.5mm; padding: 3mm 4mm; background: var(--b); color: #fff; border-radius: 2mm; font-weight: 600; font-size: 11pt; }
-.a4 .hin { margin-top: 5mm; white-space: pre-line; }
+.a4 .hin { margin-top: 4mm; white-space: pre-line; }
+.a4 tr.mit-liste td { border-bottom: 0; padding-bottom: 0; }
+.a4 .punkte { list-style: none; margin: 0.6mm 0 0.6mm; padding: 0; columns: 3; column-gap: 6mm; font-size: 7.9pt; line-height: 1.45; color: var(--d); }
+.a4 .punkte li { break-inside: avoid; padding-left: 3mm; text-indent: -3mm; }
+.a4 .punkte li::before { content: "– "; }
+.a4 .vgl { margin-top: 5mm; font-size: 8.4pt; }
+.a4 .vgl th { font-size: 10pt; color: var(--t); }
+.a4 .vgl th:not(:first-child), .a4 .vgl td:not(:first-child) { text-align: center; width: 33mm; padding-left: 1.5mm; padding-right: 1.5mm; }
+.a4 .vgl td { padding: 0.9mm 0; }
+.a4 .vgl td:first-child { padding-right: 4mm; }
+.a4 .vgl tbody tr:first-child td { font-weight: 600; }
+.a4 .bed { margin-top: 4mm; }
+.a4 .bed h2 { font-size: 10pt; font-weight: 600; padding-bottom: 2mm; border-bottom: 1.5px solid var(--t); }
+.a4 .bed dl { grid-template-columns: 36mm 1fr; gap: 0; font-size: 8.8pt; }
+.a4 .bed dt, .a4 .bed dd { padding: 0.9mm 0; border-bottom: 1px solid var(--l); }
+.a4 .bed dt { font-weight: 600; color: var(--t); }
+.a4 .bed dd { font-family: var(--body); text-align: left; }
 .a4 .fu { margin-top: auto; padding-top: 3mm; border-top: 1px solid var(--l); display: grid; grid-template-columns: repeat(3, 1fr);
   gap: 6mm; font-size: 7.3pt; color: var(--d); line-height: 1.4; }
 .a4 .fu b { color: var(--t); font-weight: 600; }
